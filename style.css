@@ -83,10 +83,10 @@ color: var(--cyan);
 }
 h1 {
 margin: 0;
-font-size: clamp(2.6rem, 8vw, 5.4rem);
-letter-spacing: 0.09em;
-line-height: 0.9;
-font-weight: 900;
+font-size: clamp(2.35rem, 6vw, 4.15rem);
+letter-spacing: -0.025em;
+line-height: 0.95;
+font-weight: 820;
 }
 .tagline {
 margin: 12px 0 0;
@@ -164,6 +164,17 @@ width: 100%;
 display: grid;
 grid-template-columns: repeat(2, minmax(0, 1fr));
 gap: 16px;
+}
+.visibility-section {
+display: grid;
+gap: 12px;
+}
+.section-title {
+margin: 6px 4px 0;
+font-size: clamp(1.35rem, 3vw, 1.85rem);
+font-weight: 800;
+letter-spacing: -0.02em;
+color: var(--text);
 }
 .card-heading-row {
 display: flex;
@@ -353,21 +364,31 @@ grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1.2fr);
 gap: 20px;
 align-items: center;
 }
-#moonCanvas {
-width: min(100%, 250px);
-height: auto;
+.moon-visual {
+width: min(100%, 300px);
+aspect-ratio: 1;
 margin: 0 auto;
+display: grid;
+place-items: center;
+}
+.moon-image,
+.moon-fallback {
+width: 100%;
+height: 100%;
+object-fit: contain;
 display: block;
-filter: drop-shadow(0 0 24px rgba(202, 224, 255, 0.13));
+filter: drop-shadow(0 0 28px rgba(202, 224, 255, 0.18));
+}
+.moon-fallback {
+display: none;
 }
 .moon-percent {
 font-size: 1.05rem;
 font-weight: 800;
 color: var(--cyan-soft);
 }
-.moon-phase {
-font-size: 1.5rem;
-margin-bottom: 6px;
+.moon-position {
+margin-top: 0;
 }
 .muted {
 color: var(--muted);
@@ -423,30 +444,29 @@ line-height: 0.94;
 color: var(--cyan-soft);
 text-shadow: 0 0 30px rgba(110, 231, 255, 0.12);
 }
-.human-caption {
-font-size: 1.05rem;
-font-weight: 700;
-margin: 12px 0 6px;
-}
-.light-layout {
+.human-breakdown {
 display: grid;
-grid-template-columns: 0.85fr 1.4fr;
-gap: 24px;
+gap: 8px;
+margin-top: 20px;
+}
+.human-craft-row {
+display: flex;
 align-items: center;
+justify-content: space-between;
+gap: 16px;
+padding: 11px 13px;
+border-radius: 14px;
+background: rgba(3, 11, 20, 0.44);
+border: 1px solid rgba(151, 210, 255, 0.09);
 }
-.bortle-number {
-font-size: clamp(2.7rem, 8vw, 5rem);
-font-weight: 900;
-line-height: 1;
-letter-spacing: -0.05em;
+.human-craft-row strong {
+font-size: 0.96rem;
 }
-.bortle-description {
-font-size: 1.15rem;
-font-weight: 700;
-margin: 10px 0 5px;
+.human-craft-count {
+font-weight: 850;
+color: var(--cyan-soft);
+font-size: 1.05rem;
 }
-.scale-note,
-.disclaimer,
 .tiny {
 color: var(--muted);
 font-size: 0.82rem;
@@ -609,8 +629,7 @@ text-align: left;
 .secondary-grid {
 grid-template-columns: 1fr;
 }
-.moon-layout,
-.light-layout {
+.moon-layout {
 grid-template-columns: 1fr;
 }
 .metric-grid.three {
