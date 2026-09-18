@@ -3,15 +3,22 @@ import * as satellite from "https://cdn.jsdelivr.net/npm/satellite.js@7.0.1/+esm
 
 const STORAGE_LOCATION = "lookUpLocationV1";
 const STORAGE_TIME = "lookUpTimeFormatV1";
+const STORAGE_LANGUAGE = "lookUpLanguageV1";
 const CONSTELLATION_NAMES_URL = "https://cdn.jsdelivr.net/gh/ofrohn/d3-celestial@master/data/constellations.json";
 const CONSTELLATION_LINES_URL = "https://cdn.jsdelivr.net/gh/ofrohn/d3-celestial@master/data/constellations.lines.json";
+const NASA_MOON_YEAR = 2026;
+const NASA_MOON_NORTH_BASE = "https://svs.gsfc.nasa.gov/vis/a000000/a005500/a005587/frames/730x730_1x1_30p/moon.";
+const NASA_MOON_SOUTH_BASE = "https://svs.gsfc.nasa.gov/vis/a000000/a005500/a005588/frames/730x730_1x1_30p/moon.";
+const HUMAN_DATA_REFRESH_MS = 45 * 60 * 1000;
 const PLANETS = [Astronomy.Body.Mercury, Astronomy.Body.Venus, Astronomy.Body.Mars, Astronomy.Body.Jupiter, Astronomy.Body.Saturn];
 const state = {
 location: null,
 timeFormat: localStorage.getItem(STORAGE_TIME) || "12h",
+language: localStorage.getItem(STORAGE_LANGUAGE) || "en",
 weather: null,
-light: null,
 humanCount: null,
+humanBreakdown: [],
+humanDataFetchedAt: 0,
 issCrew: null,
 issPass: null,
 constellationData: null,
@@ -20,8 +27,465 @@ lastAstronomy: null
 
 const el = id => document.getElementById(id);
 
+
+const I18N = {
+en: {
+personalSkyDashboard: "PERSONAL SKY DASHBOARD",
+tagline: "Your sky, right now.",
+changeLocation: "Change location",
+chooseLocation: "Choose location",
+timeFormat: "Time format",
+language: "Language",
+rightNow: "RIGHT NOW",
+yourSkyRightNow: "Your sky right now",
+live: "LIVE",
+liveData: "Live data",
+chooseLocationToBegin: "Choose a location to begin.",
+stargazing: "STARGAZING",
+observingConditions: "Observing conditions",
+waitingForLocation: "Waiting for location",
+conditionsIntro: "Weather, visibility and moonlight will be combined here.",
+clouds: "Clouds",
+precipitation: "Precipitation",
+temperature: "Temperature",
+visibility: "Visibility",
+bestWindowPlaceholder: "Best viewing window will appear here.",
+moon: "MOON",
+nextMoonrise: "Next moonrise",
+nextMoonset: "Next moonset",
+nextFullMoon: "Next full Moon",
+nextNewMoon: "Next new Moon",
+sunDarkness: "SUN & DARKNESS",
+todaysLight: "Today's light",
+nextSunrise: "Next sunrise",
+nextSunset: "Next sunset",
+daylightLength: "Daylight length",
+civilTwilightEnds: "Civil twilight ends",
+darknessBegins: "Darkness begins",
+darknessEnds: "Darkness ends",
+visibleTonight: "Visible tonight",
+visibleNow: "Visible now",
+constellations: "Constellations",
+planets: "Planets",
+orbit: "ORBIT",
+internationalSpaceStation: "International Space Station",
+humansInSpace: "Humans in space",
+spacecraftBreakdownPlaceholder: "Current spacecraft breakdown will appear here.",
+footerMain: "Look Up calculates local astronomy in your browser and combines it with current public data.",
+footerPrivacy: "Your chosen location is saved only on this device. Coordinates are sent only to the services needed for weather and place naming.",
+location: "LOCATION",
+locationQuestion: "Where should Look Up watch the sky?",
+locationHelp: "Use your device location, or search for a city. Your browser will ask permission before sharing your location.",
+useMyLocation: "Use my location",
+or: "or",
+chooseCity: "Choose a city",
+search: "Search",
+cityPlaceholder: "Saint-Eustache, Portland, Manjimup...",
+privacyCopy: "Look Up does not have its own server or account system. If you use device location, your coordinates are stored in this browser and sent only to the public services needed to calculate local results.",
+close: "Close",
+weatherUnavailable: "weather unavailable",
+daylight: "Daylight",
+moonChip: "Moon",
+planetSingular: "naked-eye planet",
+planetPlural: "naked-eye planets",
+tonight: "tonight",
+visible: "visible",
+humansInSpaceLower: "humans in space",
+readingSky: "Reading the sky...",
+combiningConditions: "Combining weather, visibility and moonlight...",
+findingConstellations: "Finding well-placed constellations...",
+checkingPlanets: "Checking the naked-eye planets...",
+calculatingIss: "Calculating the next visible pass...",
+checkingCrew: "Checking who is aboard each spacecraft...",
+noGeolocation: "This browser does not support location access. Please choose a city instead.",
+waitingPermission: "Waiting for location permission...",
+permissionDenied: "Location permission was denied. No problem - choose a city below.",
+locationFailed: "I couldn't get your location. Try again or choose a city below.",
+currentLocation: "Current location",
+searching: "Searching...",
+noCities: "No matching cities found. Try a nearby city or a different spelling.",
+chooseMatch: "Choose a match:",
+citySearchUnavailable: "City search is temporarily unavailable. Please try again in a moment.",
+bestWindowUnavailable: "A best viewing window will appear when a usable forecast is available.",
+clearSkiesTonight: "Clear skies expected tonight",
+someCloudTonight: "Some cloud tonight",
+cloudsInterfereTonight: "Clouds may interfere tonight",
+illuminatedMoon: "illuminated Moon",
+poor: "Poor",
+limited: "Limited",
+fair: "Fair",
+good: "Good",
+excellent: "Excellent",
+clearSky: "Clear sky",
+someCloudCover: "Some cloud cover",
+cloudy: "Cloudy",
+heavyCloudCover: "Heavy cloud cover",
+moonBelowHorizon: "Moon below the horizon",
+lowMoonlight: "Low moonlight",
+brightMoonlight: "Bright moonlight",
+moderateMoonlight: "Moderate moonlight",
+twilightFading: "Twilight is still fading",
+bestViewing: "Best viewing",
+belowHorizon: "Below the horizon",
+below: "below",
+nasaMoonAlt: "Current Moon phase, NASA/GSFC rendering",
+constellationUnavailable: "Constellation data is temporarily unavailable.",
+noConstellations: "No constellations meet the well-placed threshold for this time.",
+around: "Around",
+now: "NOW",
+inThe: "in the",
+noPlanetsTonight: "No naked-eye planets are well placed tonight.",
+noPlanetsNow: "No naked-eye planets are well placed right now.",
+bestAround: "best around",
+magnitudeShort: "mag",
+noIss: "No visible ISS pass was found in the next seven days, or pass data is temporarily unavailable.",
+nextVisiblePass: "Next visible pass",
+maximumAltitude: "Maximum altitude",
+closestDistance: "Closest distance",
+crewAboard: "Crew aboard",
+issCloudNote: "A visible pass is predicted, but cloud cover may interfere.",
+spacecraftUnavailable: "Spacecraft breakdown is temporarily unavailable.",
+otherCrewedSpacecraft: "Other crewed spacecraft",
+civilTwilight: "Civil twilight",
+nauticalTwilight: "Nautical twilight",
+astronomicalTwilight: "Astronomical twilight",
+night: "Night",
+newMoon: "New Moon",
+waxingCrescent: "Waxing Crescent",
+firstQuarter: "First Quarter",
+waxingGibbous: "Waxing Gibbous",
+fullMoon: "Full Moon",
+waningGibbous: "Waning Gibbous",
+lastQuarter: "Last Quarter",
+waningCrescent: "Waning Crescent",
+north: "North",
+northNortheast: "North-northeast",
+northeast: "Northeast",
+eastNortheast: "East-northeast",
+east: "East",
+eastSoutheast: "East-southeast",
+southeast: "Southeast",
+southSoutheast: "South-southeast",
+south: "South",
+southSouthwest: "South-southwest",
+southwest: "Southwest",
+westSouthwest: "West-southwest",
+west: "West",
+westNorthwest: "West-northwest",
+northwest: "Northwest",
+northNorthwest: "North-northwest",
+nearlyOverhead: "Nearly overhead",
+high: "High",
+mediumHigh: "Medium-high",
+low: "Low",
+veryLow: "Very low",
+clear: "Clear",
+mostlyClear: "Mostly clear",
+partlyCloudy: "Partly cloudy",
+overcast: "Overcast",
+foggy: "Foggy",
+drizzle: "Drizzle",
+rain: "Rain",
+snow: "Snow",
+rainShowers: "Rain showers",
+snowShowers: "Snow showers",
+thunderstorms: "Thunderstorms",
+conditionsAvailable: "Conditions available"
+},
+fr: {
+personalSkyDashboard: "TABLEAU DE BORD C\u00c9LESTE PERSONNEL",
+tagline: "Votre ciel, en ce moment.",
+changeLocation: "Changer de lieu",
+chooseLocation: "Choisir un lieu",
+timeFormat: "Format de l\u2019heure",
+language: "Langue",
+rightNow: "EN CE MOMENT",
+yourSkyRightNow: "Votre ciel en ce moment",
+live: "EN DIRECT",
+liveData: "Donn\u00e9es en direct",
+chooseLocationToBegin: "Choisissez un lieu pour commencer.",
+stargazing: "OBSERVATION",
+observingConditions: "Conditions d\u2019observation",
+waitingForLocation: "En attente d\u2019un lieu",
+conditionsIntro: "La m\u00e9t\u00e9o, la visibilit\u00e9 et la lumi\u00e8re de la Lune seront combin\u00e9es ici.",
+clouds: "Nuages",
+precipitation: "Pr\u00e9cipitations",
+temperature: "Temp\u00e9rature",
+visibility: "Visibilit\u00e9",
+bestWindowPlaceholder: "Le meilleur cr\u00e9neau d\u2019observation appara\u00eetra ici.",
+moon: "LUNE",
+nextMoonrise: "Prochain lever de Lune",
+nextMoonset: "Prochain coucher de Lune",
+nextFullMoon: "Prochaine pleine lune",
+nextNewMoon: "Prochaine nouvelle lune",
+sunDarkness: "SOLEIL & OBSCURIT\u00c9",
+todaysLight: "Lumi\u00e8re du jour",
+nextSunrise: "Prochain lever du soleil",
+nextSunset: "Prochain coucher du soleil",
+daylightLength: "Dur\u00e9e du jour",
+civilTwilightEnds: "Fin du cr\u00e9puscule civil",
+darknessBegins: "D\u00e9but de la nuit astronomique",
+darknessEnds: "Fin de la nuit astronomique",
+visibleTonight: "Visible ce soir",
+visibleNow: "Visible maintenant",
+constellations: "Constellations",
+planets: "Plan\u00e8tes",
+orbit: "ORBITE",
+internationalSpaceStation: "Station spatiale internationale",
+humansInSpace: "Humains dans l\u2019espace",
+spacecraftBreakdownPlaceholder: "La r\u00e9partition par vaisseau appara\u00eetra ici.",
+footerMain: "Look Up calcule l\u2019astronomie locale dans votre navigateur et la combine avec des donn\u00e9es publiques actuelles.",
+footerPrivacy: "Le lieu choisi est enregistr\u00e9 uniquement sur cet appareil. Les coordonn\u00e9es sont envoy\u00e9es seulement aux services n\u00e9cessaires pour la m\u00e9t\u00e9o et le nom du lieu.",
+location: "LIEU",
+locationQuestion: "Depuis quel endroit Look Up doit-il observer le ciel ?",
+locationHelp: "Utilisez la position de votre appareil ou recherchez une ville. Votre navigateur demandera votre permission avant de partager votre position.",
+useMyLocation: "Utiliser ma position",
+or: "ou",
+chooseCity: "Choisir une ville",
+search: "Rechercher",
+cityPlaceholder: "Saint-Eustache, Portland, Manjimup...",
+privacyCopy: "Look Up n\u2019a pas son propre serveur ni de syst\u00e8me de compte. Si vous utilisez la position de l\u2019appareil, vos coordonn\u00e9es sont enregistr\u00e9es dans ce navigateur et envoy\u00e9es seulement aux services publics n\u00e9cessaires aux r\u00e9sultats locaux.",
+close: "Fermer",
+weatherUnavailable: "m\u00e9t\u00e9o indisponible",
+daylight: "Jour",
+moonChip: "Lune",
+planetSingular: "plan\u00e8te visible \u00e0 l\u2019\u0153il nu",
+planetPlural: "plan\u00e8tes visibles \u00e0 l\u2019\u0153il nu",
+tonight: "ce soir",
+visible: "visibles",
+humansInSpaceLower: "humains dans l\u2019espace",
+readingSky: "Lecture du ciel...",
+combiningConditions: "Combinaison de la m\u00e9t\u00e9o, de la visibilit\u00e9 et de la lumi\u00e8re lunaire...",
+findingConstellations: "Recherche des constellations bien plac\u00e9es...",
+checkingPlanets: "V\u00e9rification des plan\u00e8tes visibles \u00e0 l\u2019\u0153il nu...",
+calculatingIss: "Calcul du prochain passage visible...",
+checkingCrew: "V\u00e9rification des personnes \u00e0 bord de chaque vaisseau...",
+noGeolocation: "Ce navigateur ne permet pas l\u2019acc\u00e8s \u00e0 la position. Choisissez plut\u00f4t une ville.",
+waitingPermission: "En attente de l\u2019autorisation de localisation...",
+permissionDenied: "L\u2019autorisation de localisation a \u00e9t\u00e9 refus\u00e9e. Aucun probl\u00e8me : choisissez une ville ci-dessous.",
+locationFailed: "Impossible d\u2019obtenir votre position. R\u00e9essayez ou choisissez une ville ci-dessous.",
+currentLocation: "Position actuelle",
+searching: "Recherche...",
+noCities: "Aucune ville correspondante trouv\u00e9e. Essayez une ville voisine ou une autre orthographe.",
+chooseMatch: "Choisissez une correspondance :",
+citySearchUnavailable: "La recherche de ville est temporairement indisponible. R\u00e9essayez dans un instant.",
+bestWindowUnavailable: "Le meilleur cr\u00e9neau appara\u00eetra lorsqu\u2019une pr\u00e9vision utilisable sera disponible.",
+clearSkiesTonight: "Ciel d\u00e9gag\u00e9 pr\u00e9vu ce soir",
+someCloudTonight: "Quelques nuages ce soir",
+cloudsInterfereTonight: "Les nuages pourraient g\u00eaner l\u2019observation ce soir",
+illuminatedMoon: "de Lune \u00e9clair\u00e9e",
+poor: "Mauvais",
+limited: "Limit\u00e9",
+fair: "Moyen",
+good: "Bon",
+excellent: "Excellent",
+clearSky: "Ciel d\u00e9gag\u00e9",
+someCloudCover: "Quelques nuages",
+cloudy: "Nuageux",
+heavyCloudCover: "Couverture nuageuse importante",
+moonBelowHorizon: "Lune sous l\u2019horizon",
+lowMoonlight: "Faible lumi\u00e8re lunaire",
+brightMoonlight: "Forte lumi\u00e8re lunaire",
+moderateMoonlight: "Lumi\u00e8re lunaire mod\u00e9r\u00e9e",
+twilightFading: "Le cr\u00e9puscule se dissipe encore",
+bestViewing: "Meilleur cr\u00e9neau",
+belowHorizon: "Sous l\u2019horizon",
+below: "en dessous",
+nasaMoonAlt: "Phase lunaire actuelle, rendu NASA/GSFC",
+constellationUnavailable: "Les donn\u00e9es sur les constellations sont temporairement indisponibles.",
+noConstellations: "Aucune constellation ne respecte le seuil de bonne visibilit\u00e9 pour cette heure.",
+around: "Vers",
+now: "MAINTENANT",
+inThe: "vers le",
+noPlanetsTonight: "Aucune plan\u00e8te visible \u00e0 l\u2019\u0153il nu n\u2019est bien plac\u00e9e ce soir.",
+noPlanetsNow: "Aucune plan\u00e8te visible \u00e0 l\u2019\u0153il nu n\u2019est bien plac\u00e9e en ce moment.",
+bestAround: "meilleur vers",
+magnitudeShort: "mag",
+noIss: "Aucun passage visible de l\u2019ISS n\u2019a \u00e9t\u00e9 trouv\u00e9 dans les sept prochains jours, ou les donn\u00e9es sont temporairement indisponibles.",
+nextVisiblePass: "Prochain passage visible",
+maximumAltitude: "Altitude maximale",
+closestDistance: "Distance minimale",
+crewAboard: "Personnes \u00e0 bord",
+issCloudNote: "Un passage visible est pr\u00e9vu, mais les nuages pourraient g\u00eaner l\u2019observation.",
+spacecraftUnavailable: "La r\u00e9partition par vaisseau est temporairement indisponible.",
+otherCrewedSpacecraft: "Autres vaisseaux habit\u00e9s",
+civilTwilight: "Cr\u00e9puscule civil",
+nauticalTwilight: "Cr\u00e9puscule nautique",
+astronomicalTwilight: "Cr\u00e9puscule astronomique",
+night: "Nuit",
+newMoon: "Nouvelle lune",
+waxingCrescent: "Premier croissant",
+firstQuarter: "Premier quartier",
+waxingGibbous: "Lune gibbeuse croissante",
+fullMoon: "Pleine lune",
+waningGibbous: "Lune gibbeuse d\u00e9croissante",
+lastQuarter: "Dernier quartier",
+waningCrescent: "Dernier croissant",
+north: "Nord",
+northNortheast: "Nord-nord-est",
+northeast: "Nord-est",
+eastNortheast: "Est-nord-est",
+east: "Est",
+eastSoutheast: "Est-sud-est",
+southeast: "Sud-est",
+southSoutheast: "Sud-sud-est",
+south: "Sud",
+southSouthwest: "Sud-sud-ouest",
+southwest: "Sud-ouest",
+westSouthwest: "Ouest-sud-ouest",
+west: "Ouest",
+westNorthwest: "Ouest-nord-ouest",
+northwest: "Nord-ouest",
+northNorthwest: "Nord-nord-ouest",
+nearlyOverhead: "Presque au z\u00e9nith",
+high: "Haut",
+mediumHigh: "Assez haut",
+low: "Bas",
+veryLow: "Tr\u00e8s bas",
+clear: "D\u00e9gag\u00e9",
+mostlyClear: "G\u00e9n\u00e9ralement d\u00e9gag\u00e9",
+partlyCloudy: "Partiellement nuageux",
+overcast: "Couvert",
+foggy: "Brouillard",
+drizzle: "Bruine",
+rain: "Pluie",
+snow: "Neige",
+rainShowers: "Averses de pluie",
+snowShowers: "Averses de neige",
+thunderstorms: "Orages",
+conditionsAvailable: "Conditions disponibles"
+}
+};
+
+function t(key) {
+return I18N[state.language]?.[key] ?? I18N.en[key] ?? key;
+}
+
+function locale() {
+return state.language === "fr" ? "fr-CA" : "en-CA";
+}
+
+function createLanguageToggle() {
+if (el("languageToggle")) return;
+const wrap = document.createElement("div");
+wrap.className = "time-toggle language-toggle";
+wrap.id = "languageToggle";
+wrap.innerHTML = '<button id="langEnButton" class="toggle-button" type="button">EN</button><button id="langFrButton" class="toggle-button" type="button">FR</button>';
+document.querySelector(".header-controls")?.appendChild(wrap);
+}
+
+function setLanguage(language) {
+state.language = language === "fr" ? "fr" : "en";
+localStorage.setItem(STORAGE_LANGUAGE, state.language);
+document.documentElement.lang = state.language;
+setLanguageToggle();
+applyLanguage();
+if (state.location) renderAllFromState();
+}
+
+function setLanguageToggle() {
+el("langEnButton")?.classList.toggle("active", state.language === "en");
+el("langFrButton")?.classList.toggle("active", state.language === "fr");
+if (el("languageToggle")) el("languageToggle").setAttribute("aria-label", t("language"));
+}
+
+function setMetricLabel(valueId, key) {
+const value = el(valueId);
+if (value?.previousElementSibling) value.previousElementSibling.textContent = t(key);
+}
+
+function applyLanguage() {
+document.documentElement.lang = state.language;
+document.title = "Look Up";
+const setText = (selector, key) => {
+const node = document.querySelector(selector);
+if (node) node.textContent = t(key);
+};
+setText(".eyebrow", "personalSkyDashboard");
+setText(".tagline", "tagline");
+el("locationButton")?.setAttribute("aria-label", t("changeLocation"));
+document.querySelector(".time-toggle:not(.language-toggle)")?.setAttribute("aria-label", t("timeFormat"));
+if (!state.location && el("locationLabel")) el("locationLabel").textContent = t("chooseLocation");
+setText(".hero .card-kicker", "rightNow");
+setText("#heroTitle", "yourSkyRightNow");
+const live = document.querySelector(".live-dot");
+if (live) {
+live.innerHTML = `<span></span> ${escapeHtml(t("live"))}`;
+live.title = t("liveData");
+}
+if (!state.location && el("heroSummary")) el("heroSummary").textContent = t("chooseLocationToBegin");
+if (!state.location && el("visibilitySectionTitle")) el("visibilitySectionTitle").textContent = t("visibleTonight");
+setText(".conditions-card .card-kicker", "stargazing");
+setText("#conditionsTitle", "observingConditions");
+setMetricLabel("cloudValue", "clouds");
+setMetricLabel("precipValue", "precipitation");
+setMetricLabel("tempValue", "temperature");
+setMetricLabel("visibilityValue", "visibility");
+if (!state.location) {
+el("gaugeLabel").textContent = t("waitingForLocation");
+el("gaugeSummary").textContent = t("conditionsIntro");
+el("bestWindow").textContent = t("bestWindowPlaceholder");
+}
+setText(".moon-card .card-kicker", "moon");
+setMetricLabel("moonriseValue", "nextMoonrise");
+setMetricLabel("moonsetValue", "nextMoonset");
+setMetricLabel("fullMoonValue", "nextFullMoon");
+setMetricLabel("newMoonValue", "nextNewMoon");
+el("moonImage")?.setAttribute("alt", t("nasaMoonAlt"));
+setText("#sunTitle", "todaysLight");
+const sunKicker = el("sunTitle")?.closest(".card-heading-row")?.querySelector(".card-kicker");
+if (sunKicker) sunKicker.textContent = t("sunDarkness");
+setMetricLabel("sunriseValue", "nextSunrise");
+setMetricLabel("sunsetValue", "nextSunset");
+setMetricLabel("dayLengthValue", "daylightLength");
+setMetricLabel("civilDuskValue", "civilTwilightEnds");
+setMetricLabel("astroDuskValue", "darknessBegins");
+setMetricLabel("astroDawnValue", "darknessEnds");
+setText("#constellationsTitle", "constellations");
+setText("#planetsTitle", "planets");
+const issKicker = el("issTitle")?.closest(".card-heading-row")?.querySelector(".card-kicker");
+if (issKicker) issKicker.textContent = t("orbit");
+setText("#issTitle", "internationalSpaceStation");
+setText("#humansTitle", "humansInSpace");
+if (!state.location) {
+el("constellationList").innerHTML = `<p class="muted">${escapeHtml(t("waitingForLocation"))}.</p>`;
+el("planetList").innerHTML = `<p class="muted">${escapeHtml(t("waitingForLocation"))}.</p>`;
+el("issContent").innerHTML = `<p class="muted">${escapeHtml(t("waitingForLocation"))}.</p>`;
+el("humanBreakdown").innerHTML = `<p class="muted">${escapeHtml(t("spacecraftBreakdownPlaceholder"))}</p>`;
+}
+const footer = document.querySelector("footer");
+if (footer) {
+const lines = footer.querySelectorAll("p");
+if (lines[0]) lines[0].textContent = t("footerMain");
+if (lines[2]) lines[2].textContent = t("footerPrivacy");
+}
+const modal = el("locationModal");
+if (modal) {
+const kicker = modal.querySelector(".card-kicker");
+if (kicker) kicker.textContent = t("location");
+el("locationModalTitle").textContent = t("locationQuestion");
+const helper = modal.querySelector("#locationModalTitle + .muted");
+if (helper) helper.textContent = t("locationHelp");
+el("useLocationButton").textContent = `\uD83D\uDCCD ${t("useMyLocation")}`;
+const orText = modal.querySelector(".or-divider span");
+if (orText) orText.textContent = t("or");
+const cityLabel = modal.querySelector('label[for="cityInput"]');
+if (cityLabel) cityLabel.textContent = t("chooseCity");
+el("cityInput").placeholder = t("cityPlaceholder");
+const searchButton = modal.querySelector('#citySearchForm button[type="submit"]');
+if (searchButton) searchButton.textContent = t("search");
+const privacy = modal.querySelector(".privacy-copy");
+if (privacy) privacy.textContent = t("privacyCopy");
+el("closeLocationModal")?.setAttribute("aria-label", t("close"));
+}
+setLanguageToggle();
+}
+
 function init() {
+createLanguageToggle();
 setTimeToggle();
+setLanguageToggle();
+applyLanguage();
 bindEvents();
 const saved = loadSavedLocation();
 if (saved) {
@@ -49,6 +513,8 @@ searchCity();
 });
 el("time12Button").addEventListener("click", () => setTimeFormat("12h"));
 el("time24Button").addEventListener("click", () => setTimeFormat("24h"));
+el("langEnButton").addEventListener("click", () => setLanguage("en"));
+el("langFrButton").addEventListener("click", () => setLanguage("fr"));
 el("locationModal").addEventListener("click", event => {
 if (event.target === el("locationModal") && state.location) closeLocationModal();
 });
@@ -95,10 +561,10 @@ el("time24Button").classList.toggle("active", state.timeFormat === "24h");
 
 async function useDeviceLocation() {
 if (!navigator.geolocation) {
-el("locationStatus").textContent = "This browser does not support location access. Please choose a city instead.";
+el("locationStatus").textContent = t("noGeolocation");
 return;
 }
-el("locationStatus").textContent = "Waiting for location permission\u2026";
+el("locationStatus").textContent = t("waitingPermission");
 el("useLocationButton").disabled = true;
 navigator.geolocation.getCurrentPosition(async position => {
 const lat = position.coords.latitude;
@@ -106,7 +572,7 @@ const lon = position.coords.longitude;
 let location = {
 lat,
 lon,
-name: "Current location",
+name: t("currentLocation"),
 region: "",
 country: "",
 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -121,8 +587,8 @@ chooseLocation(location);
 el("useLocationButton").disabled = false;
 }, error => {
 el("useLocationButton").disabled = false;
-if (error.code === error.PERMISSION_DENIED) el("locationStatus").textContent = "Location permission was denied. No problem \u2014 choose a city below.";
-else el("locationStatus").textContent = "I couldn't get your location. Try again or choose a city below.";
+if (error.code === error.PERMISSION_DENIED) el("locationStatus").textContent = t("permissionDenied");
+else el("locationStatus").textContent = t("locationFailed");
 }, {
 enableHighAccuracy: false,
 timeout: 12000,
@@ -137,12 +603,12 @@ url.searchParams.set("lat", lat.toFixed(5));
 url.searchParams.set("lon", lon.toFixed(5));
 url.searchParams.set("zoom", "10");
 url.searchParams.set("addressdetails", "1");
-url.searchParams.set("accept-language", "en");
+url.searchParams.set("accept-language", state.language);
 const response = await fetch(url.toString(), {headers: {"Accept": "application/json"}});
 if (!response.ok) throw new Error("Reverse geocoding failed");
 const data = await response.json();
 const a = data.address || {};
-const name = a.city || a.town || a.village || a.municipality || a.county || "Current location";
+const name = a.city || a.town || a.village || a.municipality || a.county || t("currentLocation");
 const region = a.state || a.province || a.region || "";
 const country = a.country || "";
 return {name, region, country};
@@ -151,23 +617,23 @@ return {name, region, country};
 async function searchCity() {
 const query = el("cityInput").value.trim();
 if (!query) return;
-el("locationStatus").textContent = "Searching\u2026";
+el("locationStatus").textContent = t("searching");
 el("cityResults").innerHTML = "";
 try {
 const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
 url.searchParams.set("name", query);
 url.searchParams.set("count", "8");
-url.searchParams.set("language", "en");
+url.searchParams.set("language", state.language);
 url.searchParams.set("format", "json");
 const response = await fetch(url.toString());
 if (!response.ok) throw new Error("Search failed");
 const data = await response.json();
 const results = data.results || [];
 if (!results.length) {
-el("locationStatus").textContent = "No matching cities found. Try a nearby city or a different spelling.";
+el("locationStatus").textContent = t("noCities");
 return;
 }
-el("locationStatus").textContent = "Choose a match:";
+el("locationStatus").textContent = t("chooseMatch");
 for (const result of results) {
 const button = document.createElement("button");
 button.className = "city-result";
@@ -188,7 +654,7 @@ source: "city"
 el("cityResults").appendChild(button);
 }
 } catch {
-el("locationStatus").textContent = "City search is temporarily unavailable. Please try again in a moment.";
+el("locationStatus").textContent = t("citySearchUnavailable");
 }
 }
 
@@ -203,7 +669,7 @@ refreshDashboard();
 function renderLocationLabel() {
 if (!state.location) return;
 const parts = [state.location.name, state.location.region].filter(Boolean);
-el("locationLabel").textContent = parts.join(", ") || "Current location";
+el("locationLabel").textContent = parts.join(", ") || t("currentLocation");
 }
 
 async function refreshDashboard() {
@@ -211,22 +677,20 @@ if (!state.location) return;
 setLoadingState();
 const tasks = await Promise.allSettled([
 fetchWeather(),
-fetchLightPollution(),
-fetchHumansInSpace(),
-fetchIssCrew(),
+fetchHumanSpaceflightData(),
 loadConstellationData(),
 findNextVisibleIssPass()
 ]);
 const weatherResult = tasks[0];
-const lightResult = tasks[1];
-const humansResult = tasks[2];
-const crewResult = tasks[3];
-const constellationsResult = tasks[4];
-const issResult = tasks[5];
+const humansResult = tasks[1];
+const constellationsResult = tasks[2];
+const issResult = tasks[3];
 if (weatherResult.status === "fulfilled") state.weather = weatherResult.value;
-if (lightResult.status === "fulfilled") state.light = lightResult.value;
-if (humansResult.status === "fulfilled") state.humanCount = humansResult.value;
-if (crewResult.status === "fulfilled") state.issCrew = crewResult.value;
+if (humansResult.status === "fulfilled") {
+state.humanCount = humansResult.value.count;
+state.humanBreakdown = humansResult.value.breakdown;
+state.issCrew = humansResult.value.issCrew;
+}
 if (constellationsResult.status === "fulfilled") state.constellationData = constellationsResult.value;
 if (issResult.status === "fulfilled") state.issPass = issResult.value;
 renderAllFromState();
@@ -238,12 +702,13 @@ renderAllFromState();
 }
 
 function setLoadingState() {
-el("heroSummary").textContent = "Reading the sky\u2026";
+el("heroSummary").textContent = t("readingSky");
 el("heroChips").innerHTML = "";
-el("gaugeSummary").textContent = "Combining sky brightness, weather and moonlight\u2026";
-el("constellationList").innerHTML = '<p class="muted">Finding well-placed constellations\u2026</p>';
-el("planetList").innerHTML = '<p class="muted">Checking the naked-eye planets\u2026</p>';
-el("issContent").innerHTML = '<p class="muted">Calculating the next visible pass\u2026</p>';
+el("gaugeSummary").textContent = t("combiningConditions");
+el("constellationList").innerHTML = `<p class="muted">${escapeHtml(t("findingConstellations"))}</p>`;
+el("planetList").innerHTML = `<p class="muted">${escapeHtml(t("checkingPlanets"))}</p>`;
+el("issContent").innerHTML = `<p class="muted">${escapeHtml(t("calculatingIss"))}</p>`;
+el("humanBreakdown").innerHTML = `<p class="muted">${escapeHtml(t("checkingCrew"))}</p>`;
 }
 
 async function fetchWeather() {
@@ -267,45 +732,48 @@ saveLocation(state.location);
 return data;
 }
 
-async function fetchLightPollution() {
-const {lat, lon} = state.location;
-const query = `lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
-const urls = [
-`https://nordapi.ee/api/v1/lightpollution?${query}`,
-`https://nordapi.ee/api/v1/mashup/stargazing?${query}`,
-`https://nordapi.ee/api/v1/mashup/location?${query}`
-];
-for (const url of urls) {
-try {
-const response = await fetch(url, {headers: {"Accept": "application/json"}});
-if (!response.ok) continue;
-const data = await response.json();
-const light = data.light_pollution || data.data?.light_pollution || data.data || data;
-if (Number.isFinite(Number(light?.bortle_class))) return light;
-} catch {
+async function fetchHumanSpaceflightData() {
+if (state.humanDataFetchedAt && Date.now() - state.humanDataFetchedAt < HUMAN_DATA_REFRESH_MS && Number.isFinite(state.humanCount)) {
+return {count: state.humanCount, breakdown: state.humanBreakdown, issCrew: state.issCrew};
 }
-}
-throw new Error("Light pollution failed");
-}
-
-async function fetchHumansInSpace() {
-const url = "https://ll.thespacedevs.com/2.3.0/astronauts/?in_space=true&is_human=true&limit=1&format=json";
-const response = await fetch(url);
+const countUrl = "https://ll.thespacedevs.com/2.3.0/astronauts/?in_space=true&is_human=true&limit=1&format=json";
+const expeditionsUrl = "https://ll.thespacedevs.com/2.3.0/expeditions/?is_active=true&mode=detailed&limit=20&format=json";
+const [countResult, expeditionResult] = await Promise.allSettled([
+fetch(countUrl).then(async response => {
 if (!response.ok) throw new Error("Human count failed");
-const data = await response.json();
-return Number.isFinite(data.count) ? data.count : null;
+return response.json();
+}),
+fetch(expeditionsUrl).then(async response => {
+if (!response.ok) throw new Error("Crew breakdown failed");
+return response.json();
+})
+]);
+let count = null;
+if (countResult.status === "fulfilled" && Number.isFinite(countResult.value.count)) count = countResult.value.count;
+const craft = new Map();
+if (expeditionResult.status === "fulfilled") {
+for (const expedition of expeditionResult.value.results || []) {
+const station = expedition.spacestation || expedition.space_station;
+const name = station?.name;
+if (!name) continue;
+if (!craft.has(name)) craft.set(name, new Set());
+const people = craft.get(name);
+for (const member of expedition.crew || expedition.crew_members || []) {
+const astronaut = member.astronaut || member.person || member;
+const key = astronaut?.id ?? astronaut?.name;
+if (key !== undefined && key !== null) people.add(String(key));
 }
-
-async function fetchIssCrew() {
-const url = "https://ll.thespacedevs.com/2.3.0/expeditions/?is_active=true&space_station=4&mode=detailed&limit=5&format=json";
-const response = await fetch(url);
-if (!response.ok) throw new Error("ISS crew failed");
-const data = await response.json();
-const active = (data.results || []).find(item => item.spacestation?.id === 4 || /international space station/i.test(item.spacestation?.name || "")) || data.results?.[0];
-if (!active) return null;
-if (Array.isArray(active.crew)) return active.crew.length;
-if (Array.isArray(active.crew_members)) return active.crew_members.length;
-return null;
+}
+}
+let breakdown = [...craft.entries()].map(([name, people]) => ({name, count: people.size})).filter(item => item.count > 0);
+breakdown.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+const known = breakdown.reduce((sum, item) => sum + item.count, 0);
+if (!Number.isFinite(count) && known > 0) count = known;
+if (Number.isFinite(count) && count > known) breakdown.push({name: "__other__", count: count - known});
+const iss = breakdown.find(item => /international space station|^iss$/i.test(item.name));
+if (!Number.isFinite(count) && !breakdown.length) throw new Error("Human spaceflight data failed");
+state.humanDataFetchedAt = Date.now();
+return {count, breakdown, issCrew: iss?.count ?? null};
 }
 
 async function loadConstellationData() {
@@ -321,7 +789,8 @@ const existing = metadata.get(id);
 if (!existing) {
 metadata.set(id, {
 id,
-name: id === "Ser" ? "Serpens" : feature.properties?.name || id,
+nameEn: id === "Ser" ? "Serpens" : feature.properties?.name || id,
+nameFr: id === "Ser" ? "Serpent" : feature.properties?.fr || feature.properties?.name || id,
 rank: Number(feature.properties?.rank || 3),
 center: coords
 });
@@ -350,7 +819,6 @@ renderConstellations(astronomy);
 renderPlanets(astronomy);
 renderIss();
 renderHumans();
-renderLightPollution();
 }
 
 function calculateAstronomy() {
@@ -438,30 +906,30 @@ return fallback;
 }
 
 function renderHero(a) {
-const weatherText = state.weather ? weatherCodeText(state.weather.current?.weather_code) : "weather unavailable";
+const weatherText = state.weather ? weatherCodeText(state.weather.current?.weather_code) : t("weatherUnavailable");
 const tempText = state.weather ? formatBothTemps(state.weather.current?.temperature_2m) : "";
 const moonName = moonPhaseName(a.moonPhaseAngle);
 const planetInfos = getPlanetInfos(a);
 const visiblePlanets = planetInfos.filter(p => p.visible);
-const timeContext = a.isDaylight ? "Daylight" : a.skyState;
+const timeContext = a.isDaylight ? t("daylight") : a.skyState;
 const summaryParts = [timeContext, weatherText];
 if (tempText) summaryParts.push(tempText);
-summaryParts.push(`${moonName} Moon`);
+summaryParts.push(state.language === "fr" ? `Lune : ${moonName}` : `${moonName} Moon`);
 el("heroSummary").textContent = summaryParts.join(" \u00B7 ");
 const chips = [];
-chips.push(`\uD83C\uDF19 ${Math.round(a.moonIllumination * 100)}% Moon`);
-if (visiblePlanets.length) chips.push(`\uD83E\uDE90 ${visiblePlanets.length} naked-eye planet${visiblePlanets.length === 1 ? "" : "s"} ${a.isDaylight ? "tonight" : "visible"}`);
-if (state.light?.bortle_class) chips.push(`\uD83C\uDF03 Bortle ${state.light.bortle_class}/9`);
+chips.push(state.language === "fr" ? `\uD83C\uDF19 ${t("moonChip")} : ${Math.round(a.moonIllumination * 100)} %` : `\uD83C\uDF19 ${Math.round(a.moonIllumination * 100)}% ${t("moonChip")}`);
+if (visiblePlanets.length) {
+const planetWord = visiblePlanets.length === 1 ? t("planetSingular") : t("planetPlural");
+chips.push(`\uD83E\uDE90 ${visiblePlanets.length} ${planetWord} ${a.isDaylight ? t("tonight") : t("visible")}`);
+}
 if (state.issPass) chips.push(`\uD83D\uDEF0\uFE0F ISS ${formatTime(state.issPass.start)}`);
-if (Number.isFinite(state.humanCount)) chips.push(`\uD83D\uDC69\u200D\uD83D\uDE80 ${state.humanCount} humans in space`);
+if (Number.isFinite(state.humanCount)) chips.push(`\uD83D\uDC69\u200D\uD83D\uDE80 ${state.humanCount} ${t("humansInSpaceLower")}`);
 el("heroChips").innerHTML = chips.map(text => `<span class="chip">${escapeHtml(text)}</span>`).join("");
 }
-
 function renderConditions(a) {
 const currentWeather = getCurrentWeatherPoint();
-const bortle = Number(state.light?.bortle_class);
 if (a.isDaylight) {
-setGauge("Daylight", null);
+setGauge(t("daylight"), null);
 const tonightSummary = summarizeTonight(a);
 el("gaugeSummary").textContent = tonightSummary;
 } else {
@@ -473,8 +941,7 @@ visibility: currentWeather.visibility,
 humidity: currentWeather.humidity,
 moonIllumination: a.moonIllumination,
 moonAltitude: a.moon.altitude,
-sunAltitude: a.sun.altitude,
-bortle
+sunAltitude: a.sun.altitude
 });
 setGauge(rating.label, rating.index);
 el("gaugeSummary").textContent = rating.reasons.join(" \u00B7 ");
@@ -483,7 +950,7 @@ el("cloudValue").textContent = Number.isFinite(currentWeather.cloud) ? `${Math.r
 el("precipValue").textContent = Number.isFinite(currentWeather.precipProbability) ? `${Math.round(currentWeather.precipProbability)}%` : Number.isFinite(currentWeather.precipitation) ? `${currentWeather.precipitation.toFixed(1)} mm` : "\u2014";
 el("tempValue").textContent = Number.isFinite(currentWeather.temperature) ? formatBothTemps(currentWeather.temperature) : "\u2014";
 el("visibilityValue").textContent = Number.isFinite(currentWeather.visibility) ? formatVisibility(currentWeather.visibility) : "\u2014";
-el("bestWindow").textContent = calculateBestViewingWindow(a) || "A best viewing window will appear when a usable forecast is available.";
+el("bestWindow").textContent = calculateBestViewingWindow(a) || t("bestWindowUnavailable");
 }
 
 function setGauge(label, index) {
@@ -500,19 +967,17 @@ needle.setAttribute("transform", `rotate(${angles[index]} 110 110)`);
 }
 
 function summarizeTonight(a) {
-const bortle = Number(state.light?.bortle_class);
 const best = getBestForecastPoint(a);
 const pieces = [];
 if (best) {
-if (best.cloud <= 20) pieces.push("Clear skies expected tonight");
-else if (best.cloud <= 50) pieces.push("Some cloud tonight");
-else pieces.push("Clouds may interfere tonight");
+if (best.cloud <= 20) pieces.push(t("clearSkiesTonight"));
+else if (best.cloud <= 50) pieces.push(t("someCloudTonight"));
+else pieces.push(t("cloudsInterfereTonight"));
 }
-if (Number.isFinite(bortle)) pieces.push(`Bortle ${bortle}/9 \u00B7 ${bortleWords(bortle)}`);
-pieces.push(`${Math.round(a.moonIllumination * 100)}% illuminated Moon`);
+if (state.language === "fr") pieces.push(`${Math.round(a.moonIllumination * 100)} % ${t("illuminatedMoon")}`);
+else pieces.push(`${Math.round(a.moonIllumination * 100)}% ${t("illuminatedMoon")}`);
 return pieces.join(" \u00B7 ");
 }
-
 function scoreObservingConditions(input) {
 let score = 100;
 const reasons = [];
@@ -521,7 +986,6 @@ const pop = finiteOr(input.precipProbability, 0);
 const precipitation = finiteOr(input.precipitation, 0);
 const visibility = finiteOr(input.visibility, 20000);
 const humidity = finiteOr(input.humidity, 60);
-const bortle = Number.isFinite(input.bortle) ? input.bortle : null;
 if (cloud > 85) score -= 72;
 else if (cloud > 65) score -= 52;
 else if (cloud > 40) score -= 31;
@@ -532,26 +996,22 @@ if (visibility < 5000) score -= 23;
 else if (visibility < 10000) score -= 12;
 if (humidity > 92) score -= 7;
 if (input.moonAltitude > 0) score -= Math.max(0, input.moonIllumination - 0.35) * 20;
-if (Number.isFinite(bortle)) score -= Math.max(0, bortle - 1) * 3.5;
 if (input.sunAltitude > -6) score -= 35;
 else if (input.sunAltitude > -12) score -= 20;
 else if (input.sunAltitude > -18) score -= 10;
 score = Math.max(0, Math.min(100, score));
 let index = score >= 83 ? 4 : score >= 65 ? 3 : score >= 45 ? 2 : score >= 25 ? 1 : 0;
-if (Number.isFinite(bortle) && bortle >= 8) index = Math.min(index, 2);
-else if (Number.isFinite(bortle) && bortle >= 6) index = Math.min(index, 3);
 if (cloud >= 92) index = 0;
-const labels = ["Poor", "Limited", "Fair", "Good", "Excellent"];
-if (cloud <= 20) reasons.push("Clear sky");
-else if (cloud <= 50) reasons.push("Some cloud cover");
-else if (cloud <= 80) reasons.push("Cloudy");
-else reasons.push("Heavy cloud cover");
-if (input.moonAltitude <= 0) reasons.push("Moon below the horizon");
-else if (input.moonIllumination < 0.25) reasons.push("Low moonlight");
-else if (input.moonIllumination > 0.75) reasons.push("Bright moonlight");
-else reasons.push("Moderate moonlight");
-if (Number.isFinite(bortle)) reasons.push(`Bortle ${bortle}/9 \u00B7 ${bortleWords(bortle)}`);
-if (input.sunAltitude > -18 && input.sunAltitude <= -0.833) reasons.push("Twilight is still fading");
+const labels = [t("poor"), t("limited"), t("fair"), t("good"), t("excellent")];
+if (cloud <= 20) reasons.push(t("clearSky"));
+else if (cloud <= 50) reasons.push(t("someCloudCover"));
+else if (cloud <= 80) reasons.push(t("cloudy"));
+else reasons.push(t("heavyCloudCover"));
+if (input.moonAltitude <= 0) reasons.push(t("moonBelowHorizon"));
+else if (input.moonIllumination < 0.25) reasons.push(t("lowMoonlight"));
+else if (input.moonIllumination > 0.75) reasons.push(t("brightMoonlight"));
+else reasons.push(t("moderateMoonlight"));
+if (input.sunAltitude > -18 && input.sunAltitude <= -0.833) reasons.push(t("twilightFading"));
 return {score, index, label: labels[index], reasons};
 }
 
@@ -595,7 +1055,6 @@ return candidates.reduce((best, item) => item.rating.score > best.rating.score ?
 function getNightForecastScores(a) {
 const hourly = state.weather?.hourly;
 if (!hourly?.time?.length) return [];
-const bortle = Number(state.light?.bortle_class);
 let start = a.tonight.dusk?.getTime() ?? Date.now();
 let end = a.tonight.dawn?.getTime() ?? start + 12 * 60 * 60 * 1000;
 if (end <= start) end = start + 12 * 60 * 60 * 1000;
@@ -620,8 +1079,7 @@ const rating = scoreObservingConditions({
 ...weather,
 moonIllumination: illum,
 moonAltitude: moon.altitude,
-sunAltitude: sun.altitude,
-bortle
+sunAltitude: sun.altitude
 });
 out.push({weather, rating});
 }
@@ -643,78 +1101,122 @@ while (end < scores.length - 1 && scores[end + 1].rating.score >= peak - 6) end+
 const startTime = scores[start].weather.time;
 let endTime = new Date(scores[end].weather.time.getTime() + 60 * 60 * 1000);
 if (a.tonight.dawn && endTime > a.tonight.dawn) endTime = a.tonight.dawn;
-return `Best viewing: ${formatTime(startTime)}\u2013${formatTime(endTime)} \u00B7 ${scores[bestIndex].rating.label}`;
+return `${t("bestViewing")}: ${formatTime(startTime)}\u2013${formatTime(endTime)} \u00B7 ${scores[bestIndex].rating.label}`;
 }
 
 function renderMoon(a) {
 const percent = Math.round(a.moonIllumination * 100);
-el("moonPercent").textContent = `${percent}% illuminated`;
+el("moonPercent").textContent = state.language === "fr" ? `${percent} % \u00E9clair\u00E9e` : `${percent}% illuminated`;
 el("moonPhase").textContent = moonPhaseName(a.moonPhaseAngle);
-el("moonPosition").textContent = a.moon.altitude > 0 ? `${altitudeWords(a.moon.altitude)} in the ${compassDirection(a.moon.azimuth)} \u00B7 ${Math.round(a.moon.altitude)}\u00B0` : `Below the horizon \u00B7 ${Math.round(Math.abs(a.moon.altitude))}\u00B0 below`;
+el("moonPosition").textContent = a.moon.altitude > 0
+? (state.language === "fr" ? `${altitudeWords(a.moon.altitude)} \u00B7 ${compassDirection(a.moon.azimuth)} \u00B7 ${Math.round(a.moon.altitude)}\u00B0` : `${altitudeWords(a.moon.altitude)} in the ${compassDirection(a.moon.azimuth)} \u00B7 ${Math.round(a.moon.altitude)}\u00B0`)
+: `${t("belowHorizon")} \u00B7 ${Math.round(Math.abs(a.moon.altitude))}\u00B0 ${t("below")}`;
 el("moonriseValue").textContent = formatAstroTime(a.moonrise);
 el("moonsetValue").textContent = formatAstroTime(a.moonset);
 el("fullMoonValue").textContent = formatAstroDate(a.moonQuarters.nextFull);
 el("newMoonValue").textContent = formatAstroDate(a.moonQuarters.nextNew);
-drawMoon(a.moonPhaseAngle);
+renderMoonVisual(a.now, a.moonPhaseAngle);
+}
+function renderMoonVisual(date, phaseDegrees) {
+const image = el("moonImage");
+const canvas = el("moonCanvas");
+const url = nasaMoonImageUrl(date);
+if (!url) {
+image.style.display = "none";
+canvas.style.display = "block";
+drawMoonFallback(phaseDegrees);
+return;
+}
+canvas.style.display = "none";
+image.style.display = "block";
+if (image.dataset.url === url && image.complete && image.naturalWidth) return;
+image.dataset.url = url;
+image.alt = state.language === "fr" ? `Lune : ${moonPhaseName(phaseDegrees)}, rendu NASA/GSFC` : `${moonPhaseName(phaseDegrees)} Moon, NASA/GSFC rendering`;
+image.onload = () => {
+if (image.dataset.url !== url) return;
+image.style.display = "block";
+canvas.style.display = "none";
+};
+image.onerror = () => {
+if (image.dataset.url !== url) return;
+image.style.display = "none";
+canvas.style.display = "block";
+drawMoonFallback(phaseDegrees);
+};
+image.src = url;
 }
 
-function drawMoon(phaseDegrees) {
+function nasaMoonImageUrl(date) {
+if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+if (date.getUTCFullYear() !== NASA_MOON_YEAR) return null;
+const yearStart = Date.UTC(NASA_MOON_YEAR, 0, 1, 0, 0, 0);
+const frame = Math.floor((date.getTime() - yearStart) / 3600000) + 1;
+if (frame < 1 || frame > 8760) return null;
+const number = String(frame).padStart(4, "0");
+const base = state.location?.lat < 0 ? NASA_MOON_SOUTH_BASE : NASA_MOON_NORTH_BASE;
+return `${base}${number}.jpg`;
+}
+
+function drawMoonFallback(phaseDegrees) {
 const canvas = el("moonCanvas");
 const ctx = canvas.getContext("2d");
 const w = canvas.width;
 const h = canvas.height;
 const cx = w / 2;
 const cy = h / 2;
-const r = Math.min(w, h) * 0.41;
-const image = ctx.createImageData(w, h);
-const data = image.data;
-const phase = phaseDegrees * Math.PI / 180;
-const sx = Math.sin(phase);
-const sz = -Math.cos(phase);
-for (let y = 0; y < h; y++) {
-for (let x = 0; x < w; x++) {
-const dx = (x - cx) / r;
-const dy = (y - cy) / r;
-const rr = dx * dx + dy * dy;
-const idx = (y * w + x) * 4;
-if (rr > 1) {
-data[idx + 3] = 0;
-continue;
-}
-const nz = Math.sqrt(Math.max(0, 1 - rr));
-const lightDot = dx * sx + nz * sz;
-const limb = Math.max(0.18, nz);
-let brightness;
-if (lightDot > 0) brightness = 178 + 58 * Math.min(1, lightDot * 1.8) + 15 * limb;
-else brightness = 20 + 18 * limb;
-const craterNoise = 1 - 0.055 * (Math.sin(x * 0.19) * Math.sin(y * 0.13) + Math.sin((x + y) * 0.071));
-brightness *= craterNoise;
-data[idx] = Math.min(255, brightness * 1.01);
-data[idx + 1] = Math.min(255, brightness * 1.02);
-data[idx + 2] = Math.min(255, brightness * 1.05);
-data[idx + 3] = 255;
-}
-}
+const r = Math.min(w, h) * 0.43;
+const displayPhase = state.location?.lat < 0 ? (360 - phaseDegrees) % 360 : phaseDegrees;
 ctx.clearRect(0, 0, w, h);
-ctx.putImageData(image, 0, 0);
 ctx.save();
 ctx.beginPath();
 ctx.arc(cx, cy, r, 0, Math.PI * 2);
 ctx.clip();
-ctx.globalAlpha = 0.11;
-ctx.fillStyle = "#102036";
-const craters = [[-0.28,-0.18,0.13],[0.22,-0.26,0.09],[0.11,0.22,0.16],[-0.36,0.31,0.08],[0.38,0.1,0.07],[-0.02,-0.43,0.06]];
-for (const [px, py, pr] of craters) {
-ctx.beginPath();
-ctx.arc(cx + px * r, cy + py * r, pr * r, 0, Math.PI * 2);
-ctx.fill();
-}
+ctx.fillStyle = "#1a2029";
+ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+ctx.save();
+buildMoonLitPath(ctx, displayPhase, cx, cy, r);
+ctx.clip();
+const gradient = ctx.createRadialGradient(cx - r * 0.22, cy - r * 0.22, r * 0.08, cx, cy, r);
+gradient.addColorStop(0, "#f7f8f5");
+gradient.addColorStop(0.72, "#d8dce0");
+gradient.addColorStop(1, "#aeb5bd");
+ctx.fillStyle = gradient;
+ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+ctx.restore();
 ctx.restore();
 ctx.beginPath();
 ctx.arc(cx, cy, r, 0, Math.PI * 2);
 ctx.strokeStyle = "rgba(225,240,255,0.22)";
 ctx.lineWidth = 1.5;
 ctx.stroke();
+}
+
+function buildMoonLitPath(ctx, phaseDegrees, cx, cy, r) {
+const phase = ((phaseDegrees % 360) + 360) % 360;
+const waxing = phase <= 180;
+const radians = phase * Math.PI / 180;
+const steps = 100;
+const first = [];
+const second = [];
+for (let i = 0; i <= steps; i++) {
+const yNorm = -1 + (2 * i / steps);
+const halfWidth = Math.sqrt(Math.max(0, 1 - yNorm * yNorm));
+const limb = halfWidth * r;
+const terminator = (waxing ? Math.cos(radians) : -Math.cos(radians)) * limb;
+const y = cy + yNorm * r;
+if (waxing) {
+first.push([cx + terminator, y]);
+second.push([cx + limb, y]);
+} else {
+first.push([cx - limb, y]);
+second.push([cx + terminator, y]);
+}
+}
+ctx.beginPath();
+ctx.moveTo(first[0][0], first[0][1]);
+for (let i = 1; i < first.length; i++) ctx.lineTo(first[i][0], first[i][1]);
+for (let i = second.length - 1; i >= 0; i--) ctx.lineTo(second[i][0], second[i][1]);
+ctx.closePath();
 }
 
 function renderSun(a) {
@@ -742,25 +1244,27 @@ const seconds = daily.sunset[index] - daily.sunrise[index];
 if (!Number.isFinite(seconds) || seconds <= 0) return "\u2014";
 const hours = Math.floor(seconds / 3600);
 const minutes = Math.round((seconds % 3600) / 60);
-return `${hours}h ${minutes}m`;
+return state.language === "fr" ? `${hours} h ${minutes} min` : `${hours}h ${minutes}m`;
 }
 
 function renderConstellations(a) {
 const daylight = a.isDaylight;
-el("constellationsTitle").textContent = daylight ? "Visible tonight" : "Visible now";
-el("constellationTime").textContent = daylight ? `Around ${formatTime(a.evaluationTime)}` : "NOW";
+el("visibilitySectionTitle").textContent = daylight ? t("visibleTonight") : t("visibleNow");
+el("constellationTime").textContent = daylight ? `${t("around")} ${formatTime(a.evaluationTime)}` : t("now");
 if (!state.constellationData) {
-el("constellationList").innerHTML = '<p class="muted error-note">Constellation data is temporarily unavailable.</p>';
+el("constellationList").innerHTML = `<p class="muted error-note">${escapeHtml(t("constellationUnavailable"))}</p>`;
 return;
 }
 const items = getVisibleConstellations(a.evaluationTime, a.observer);
 if (!items.length) {
-el("constellationList").innerHTML = '<p class="muted">No constellations meet the \u201Cwell placed\u201D threshold for this time.</p>';
+el("constellationList").innerHTML = `<p class="muted">${escapeHtml(t("noConstellations"))}</p>`;
 return;
 }
-el("constellationList").innerHTML = items.map(item => `<div class="object-row"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(altitudeWords(item.altitude))} in the ${escapeHtml(compassDirection(item.azimuth))}</small></div><div class="object-altitude">${Math.round(item.altitude)}\u00B0</div></div>`).join("");
+el("constellationList").innerHTML = items.map(item => {
+const position = state.language === "fr" ? `${altitudeWords(item.altitude)} \u00B7 ${compassDirection(item.azimuth)}` : `${altitudeWords(item.altitude)} in the ${compassDirection(item.azimuth)}`;
+return `<div class="object-row"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(position)}</small></div><div class="object-altitude">${Math.round(item.altitude)}\u00B0</div></div>`;
+}).join("");
 }
-
 function getVisibleConstellations(date, observer) {
 const {metadata, shapes} = state.constellationData;
 const results = [];
@@ -782,7 +1286,7 @@ if (centerHor.altitude < 10 || maxAltitude < 25 || fraction < 0.45) continue;
 const rankBonus = meta.rank === 1 ? 25 : meta.rank === 2 ? 12 : 0;
 const score = centerHor.altitude + maxAltitude * 0.35 + fraction * 40 + rankBonus;
 results.push({
-name: meta.name,
+name: state.language === "fr" ? meta.nameFr : meta.nameEn,
 altitude: centerHor.altitude,
 azimuth: centerHor.azimuth,
 score
@@ -797,20 +1301,33 @@ return ((longitude % 360) + 360) % 360 / 15;
 
 function renderPlanets(a) {
 const daylight = a.isDaylight;
-el("planetsTitle").textContent = daylight ? "Visible tonight" : "Visible now";
 const infos = getPlanetInfos(a).filter(item => item.visible);
 if (!infos.length) {
-el("planetList").innerHTML = `<p class="muted">No naked-eye planets are well placed ${daylight ? "tonight" : "right now"}.</p>`;
+el("planetList").innerHTML = `<p class="muted">${escapeHtml(daylight ? t("noPlanetsTonight") : t("noPlanetsNow"))}</p>`;
 return;
 }
-el("planetList").innerHTML = infos.map(item => `<div class="object-row"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(altitudeWords(item.altitude))} in the ${escapeHtml(compassDirection(item.azimuth))}${item.bestTime ? ` \u00B7 best around ${escapeHtml(formatTime(item.bestTime))}` : ""}</small></div><div class="object-altitude">${Math.round(item.altitude)}\u00B0 \u00B7 mag ${item.magnitude.toFixed(1)}</div></div>`).join("");
+el("planetList").innerHTML = infos.map(item => {
+const position = state.language === "fr" ? `${altitudeWords(item.altitude)} \u00B7 ${compassDirection(item.azimuth)}` : `${altitudeWords(item.altitude)} in the ${compassDirection(item.azimuth)}`;
+return `<div class="object-row"><div><strong>${escapeHtml(planetName(item.body))}</strong><small>${escapeHtml(position)}${item.bestTime ? ` \u00B7 ${escapeHtml(t("bestAround"))} ${escapeHtml(formatTime(item.bestTime))}` : ""}</small></div><div class="object-altitude">${Math.round(item.altitude)}\u00B0 \u00B7 ${escapeHtml(t("magnitudeShort"))} ${item.magnitude.toFixed(1)}</div></div>`;
+}).join("");
 }
-
 function getPlanetInfos(a) {
 if (!a.isDaylight) {
 return PLANETS.map(body => planetAtTime(body, a.now, a.observer)).map(info => ({...info, visible: planetVisible(info, a.now, a.observer), bestTime: null}));
 }
 return PLANETS.map(body => bestPlanetTonight(body, a.now, a.observer));
+}
+
+function planetName(body) {
+if (state.language !== "fr") return String(body);
+const names = {
+Mercury: "Mercure",
+Venus: "V\u00E9nus",
+Mars: "Mars",
+Jupiter: "Jupiter",
+Saturn: "Saturne"
+};
+return names[String(body)] || String(body);
 }
 
 function planetAtTime(body, date, observer) {
@@ -897,15 +1414,6 @@ if (line1 && line2) return {line1, line2};
 } catch {
 }
 try {
-const response = await fetch("https://nordapi.ee/api/v1/iss/tle");
-if (response.ok) {
-const data = await response.json();
-const source = data.tle || data.data || data;
-if (source.line1 && source.line2) return {line1: source.line1, line2: source.line2};
-}
-} catch {
-}
-try {
 const response = await fetch("https://api.wheretheiss.at/v1/satellites/25544/tles");
 if (response.ok) {
 const data = await response.json();
@@ -978,16 +1486,15 @@ return horizontalForBody(Astronomy.Body.Sun, date, observer).altitude;
 
 function renderIss() {
 if (!state.issPass) {
-el("issContent").innerHTML = '<p class="muted">No visible ISS pass was found in the next seven days, or pass data is temporarily unavailable.</p>';
+el("issContent").innerHTML = `<p class="muted">${escapeHtml(t("noIss"))}</p>`;
 return;
 }
 const pass = state.issPass;
 const cloud = weatherAt(pass.peakTime)?.cloud;
-const cloudNote = Number.isFinite(cloud) && cloud >= 70 ? `<p class="muted">\u2601\uFE0F A visible pass is predicted, but cloud cover may interfere.</p>` : "";
-const crew = Number.isFinite(state.issCrew) ? `<div class="metric"><span>Crew aboard</span><strong>${state.issCrew}</strong></div>` : "";
-el("issContent").innerHTML = `<p class="iss-main-time">${escapeHtml(formatTime(pass.start))}</p><p class="muted">Next visible pass</p><p class="route-line">${escapeHtml(pass.startDirection)} \u2192 ${escapeHtml(pass.endDirection)}</p><div class="metric-grid three"><div class="metric"><span>Maximum altitude</span><strong>${escapeHtml(altitudeWords(pass.maxElevation))} \u00B7 ${Math.round(pass.maxElevation)}\u00B0</strong></div><div class="metric"><span>Closest distance</span><strong>~${Math.round(pass.closestDistanceKm)} km</strong></div>${crew}</div>${cloudNote}`;
+const cloudNote = Number.isFinite(cloud) && cloud >= 70 ? `<p class="muted">\u2601\uFE0F ${escapeHtml(t("issCloudNote"))}</p>` : "";
+const crew = Number.isFinite(state.issCrew) ? `<div class="metric"><span>${escapeHtml(t("crewAboard"))}</span><strong>${state.issCrew}</strong></div>` : "";
+el("issContent").innerHTML = `<p class="iss-main-time">${escapeHtml(formatTime(pass.start))}</p><p class="muted">${escapeHtml(t("nextVisiblePass"))}</p><p class="route-line">${escapeHtml(pass.startDirection)} \u2192 ${escapeHtml(pass.endDirection)}</p><div class="metric-grid three"><div class="metric"><span>${escapeHtml(t("maximumAltitude"))}</span><strong>${escapeHtml(altitudeWords(pass.maxElevation))} \u00B7 ${Math.round(pass.maxElevation)}\u00B0</strong></div><div class="metric"><span>${escapeHtml(t("closestDistance"))}</span><strong>~${Math.round(pass.closestDistanceKm)} km</strong></div>${crew}</div>${cloudNote}`;
 }
-
 function weatherAt(date) {
 const hourly = state.weather?.hourly;
 if (!hourly?.time?.length) return null;
@@ -1004,97 +1511,71 @@ best = i;
 return {cloud: hourly.cloud_cover?.[best]};
 }
 
+function spacecraftName(name) {
+if (name === "__other__") return t("otherCrewedSpacecraft");
+if (state.language !== "fr") return name;
+if (/international space station|^iss$/i.test(name)) return t("internationalSpaceStation");
+if (/tiangong/i.test(name)) return "Station spatiale Tiangong";
+return name;
+}
+
 function renderHumans() {
 el("humanCount").textContent = Number.isFinite(state.humanCount) ? state.humanCount : "\u2014";
-el("humanCaption").textContent = Number.isFinite(state.humanCount) ? `${state.humanCount === 1 ? "human" : "humans"} currently in space` : "Current human spaceflight count unavailable";
-el("issCrewValue").textContent = Number.isFinite(state.issCrew) ? `ISS crew: ${state.issCrew}` : "ISS crew: unavailable";
-}
-
-function renderLightPollution() {
-const light = state.light;
-if (!light || !Number.isFinite(Number(light.bortle_class))) {
-el("bortleNumber").textContent = "\u2014";
-el("bortleDescription").textContent = "Light-pollution estimate is temporarily unavailable.";
-el("sqmValue").textContent = "\u2014";
-el("starsValue").textContent = "\u2014";
-el("skyQualityValue").textContent = "\u2014";
+if (!state.humanBreakdown?.length) {
+el("humanBreakdown").innerHTML = `<p class="muted">${escapeHtml(t("spacecraftUnavailable"))}</p>`;
 return;
 }
-const bortle = Number(light.bortle_class);
-el("bortleNumber").textContent = `Bortle ${bortle}`;
-el("bortleDescription").textContent = `Light pollution: ${bortle}/9 \u00B7 ${bortleWords(bortle)}`;
-el("sqmValue").textContent = Number.isFinite(Number(light.sqm_estimate)) ? Number(light.sqm_estimate).toFixed(2) : "\u2014";
-el("starsValue").textContent = light.naked_eye_stars || "\u2014";
-el("skyQualityValue").textContent = titleCase(light.sky_quality || "\u2014");
-el("lightDisclaimer").textContent = light.disclaimer || "Estimated from nearby population patterns, not measured directly from your exact observing spot.";
+el("humanBreakdown").innerHTML = state.humanBreakdown.map(item => {
+const name = spacecraftName(item.name);
+return `<div class="human-craft-row"><strong>${escapeHtml(name)}</strong><span class="human-craft-count">${item.count}</span></div>`;
+}).join("");
 }
-
 function describeSunAltitude(altitude) {
-if (altitude >= -0.833) return "Daylight";
-if (altitude >= -6) return "Civil twilight";
-if (altitude >= -12) return "Nautical twilight";
-if (altitude >= -18) return "Astronomical twilight";
-return "Night";
+if (altitude >= -0.833) return t("daylight");
+if (altitude >= -6) return t("civilTwilight");
+if (altitude >= -12) return t("nauticalTwilight");
+if (altitude >= -18) return t("astronomicalTwilight");
+return t("night");
 }
-
 function moonPhaseName(angle) {
 const a = ((angle % 360) + 360) % 360;
-if (a < 22.5 || a >= 337.5) return "New Moon";
-if (a < 67.5) return "Waxing Crescent";
-if (a < 112.5) return "First Quarter";
-if (a < 157.5) return "Waxing Gibbous";
-if (a < 202.5) return "Full Moon";
-if (a < 247.5) return "Waning Gibbous";
-if (a < 292.5) return "Last Quarter";
-return "Waning Crescent";
+if (a < 22.5 || a >= 337.5) return t("newMoon");
+if (a < 67.5) return t("waxingCrescent");
+if (a < 112.5) return t("firstQuarter");
+if (a < 157.5) return t("waxingGibbous");
+if (a < 202.5) return t("fullMoon");
+if (a < 247.5) return t("waningGibbous");
+if (a < 292.5) return t("lastQuarter");
+return t("waningCrescent");
 }
-
 function compassDirection(azimuth) {
-const names = ["North", "North-northeast", "Northeast", "East-northeast", "East", "East-southeast", "Southeast", "South-southeast", "South", "South-southwest", "Southwest", "West-southwest", "West", "West-northwest", "Northwest", "North-northwest"];
+const keys = ["north", "northNortheast", "northeast", "eastNortheast", "east", "eastSoutheast", "southeast", "southSoutheast", "south", "southSouthwest", "southwest", "westSouthwest", "west", "westNorthwest", "northwest", "northNorthwest"];
 const index = Math.round((((azimuth % 360) + 360) % 360) / 22.5) % 16;
-return names[index];
+return t(keys[index]);
 }
-
 function altitudeWords(altitude) {
-if (altitude >= 75) return "Nearly overhead";
-if (altitude >= 50) return "High";
-if (altitude >= 25) return "Medium-high";
-if (altitude >= 10) return "Low";
-if (altitude >= 0) return "Very low";
-return "Below the horizon";
+if (altitude >= 75) return t("nearlyOverhead");
+if (altitude >= 50) return t("high");
+if (altitude >= 25) return t("mediumHigh");
+if (altitude >= 10) return t("low");
+if (altitude >= 0) return t("veryLow");
+return t("belowHorizon");
 }
-
-function bortleWords(value) {
-const map = {
-1: "pristine dark sky",
-2: "very dark sky",
-3: "rural dark sky",
-4: "rural-suburban transition",
-5: "suburban sky",
-6: "bright suburban sky",
-7: "suburban-urban sky",
-8: "city sky",
-9: "inner-city sky"
-};
-return map[Math.round(value)] || "estimated sky brightness";
-}
-
 function weatherCodeText(code) {
 const c = Number(code);
-if (c === 0) return "Clear";
-if (c === 1) return "Mostly clear";
-if (c === 2) return "Partly cloudy";
-if (c === 3) return "Overcast";
-if (c === 45 || c === 48) return "Foggy";
-if ([51,53,55,56,57].includes(c)) return "Drizzle";
-if ([61,63,65,66,67].includes(c)) return "Rain";
-if ([71,73,75,77].includes(c)) return "Snow";
-if ([80,81,82].includes(c)) return "Rain showers";
-if ([85,86].includes(c)) return "Snow showers";
-if ([95,96,99].includes(c)) return "Thunderstorms";
-return "Conditions available";
+if (c === 0) return t("clear");
+if (c === 1) return t("mostlyClear");
+if (c === 2) return t("partlyCloudy");
+if (c === 3) return t("overcast");
+if (c === 45 || c === 48) return t("foggy");
+if ([51,53,55,56,57].includes(c)) return t("drizzle");
+if ([61,63,65,66,67].includes(c)) return t("rain");
+if ([71,73,75,77].includes(c)) return t("snow");
+if ([80,81,82].includes(c)) return t("rainShowers");
+if ([85,86].includes(c)) return t("snowShowers");
+if ([95,96,99].includes(c)) return t("thunderstorms");
+return t("conditionsAvailable");
 }
-
 function formatBothTemps(celsius) {
 if (!Number.isFinite(Number(celsius))) return "\u2014";
 const c = Math.round(Number(celsius));
@@ -1117,7 +1598,7 @@ return formatTime(date);
 function formatAstroDate(value) {
 if (!value) return "\u2014";
 const date = value.date || value;
-return new Intl.DateTimeFormat("en-CA", {
+return new Intl.DateTimeFormat(locale(), {
 timeZone: currentTimezone(),
 month: "short",
 day: "numeric"
@@ -1126,7 +1607,7 @@ day: "numeric"
 
 function formatTime(date) {
 if (!date) return "\u2014";
-return new Intl.DateTimeFormat("en-CA", {
+return new Intl.DateTimeFormat(locale(), {
 timeZone: currentTimezone(),
 hour: "numeric",
 minute: "2-digit",
