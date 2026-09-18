@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Look Up</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="starfield" aria-hidden="true"></div>
+<header class="site-header">
+<div>
+<p class="eyebrow">PERSONAL SKY DASHBOARD</p>
+<h1>LOOK UP</h1>
+<p class="tagline">Your sky, right now.</p>
+</div>
+<div class="header-controls">
+<button class="control-button" id="locationButton" type="button" aria-label="Change location">📍 <span id="locationLabel">Choose location</span></button>
+<div class="time-toggle" aria-label="Time format">
+<button id="time12Button" class="toggle-button active" type="button">12h</button>
+<button id="time24Button" class="toggle-button" type="button">24h</button>
+</div>
+</div>
+</header>
+<main>
+<section class="hero card card-wide" aria-labelledby="heroTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">RIGHT NOW</p>
+<h2 id="heroTitle">Your sky right now</h2>
+</div>
+<span class="live-dot" title="Live data"><span></span> LIVE</span>
+</div>
+<p class="hero-summary" id="heroSummary">Choose a location to begin.</p>
+<div class="hero-chips" id="heroChips"></div>
+</section>
+<div class="primary-grid">
+<section class="card conditions-card" aria-labelledby="conditionsTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">STARGAZING</p>
+<h2 id="conditionsTitle">Observing conditions</h2>
+</div>
+</div>
+<div class="gauge-wrap" role="img" aria-labelledby="gaugeLabel gaugeSummary">
+<svg class="gauge" viewBox="0 0 220 125" aria-hidden="true">
+<path class="gauge-track" d="M25 110 A85 85 0 0 1 195 110" pathLength="100"></path>
+<path class="gauge-segment gauge-poor" d="M25 110 A85 85 0 0 1 195 110" pathLength="100"></path>
+<path class="gauge-segment gauge-limited" d="M25 110 A85 85 0 0 1 195 110" pathLength="100"></path>
+<path class="gauge-segment gauge-fair" d="M25 110 A85 85 0 0 1 195 110" pathLength="100"></path>
+<path class="gauge-segment gauge-good" d="M25 110 A85 85 0 0 1 195 110" pathLength="100"></path>
+<path class="gauge-segment gauge-excellent" d="M25 110 A85 85 0 0 1 195 110" pathLength="100"></path>
+<line id="gaugeNeedle" class="gauge-needle" x1="110" y1="110" x2="110" y2="43"></line>
+<circle class="gauge-hub" cx="110" cy="110" r="7"></circle>
+</svg>
+<div class="gauge-label" id="gaugeLabel">Waiting for location</div>
+</div>
+<p class="summary-line" id="gaugeSummary">Weather, moonlight and light pollution will be combined here.</p>
+<div class="metric-grid four" id="conditionsMetrics">
+<div class="metric"><span>Clouds</span><strong id="cloudValue">—</strong></div>
+<div class="metric"><span>Precipitation</span><strong id="precipValue">—</strong></div>
+<div class="metric"><span>Temperature</span><strong id="tempValue">—</strong></div>
+<div class="metric"><span>Visibility</span><strong id="visibilityValue">—</strong></div>
+</div>
+<p class="best-window" id="bestWindow">Best viewing window will appear here.</p>
+</section>
+<section class="card moon-card" aria-labelledby="moonTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">MOON</p>
+<h2 id="moonTitle">Moon</h2>
+</div>
+<span class="moon-percent" id="moonPercent">—</span>
+</div>
+<div class="moon-layout">
+<canvas id="moonCanvas" width="260" height="260" aria-label="Graphical Moon phase"></canvas>
+<div>
+<h3 class="moon-phase" id="moonPhase">—</h3>
+<p class="muted" id="moonPosition">—</p>
+<div class="metric-grid two compact">
+<div class="metric"><span>Next moonrise</span><strong id="moonriseValue">—</strong></div>
+<div class="metric"><span>Next moonset</span><strong id="moonsetValue">—</strong></div>
+<div class="metric"><span>Next full Moon</span><strong id="fullMoonValue">—</strong></div>
+<div class="metric"><span>Next new Moon</span><strong id="newMoonValue">—</strong></div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<section class="card card-wide" aria-labelledby="sunTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">SUN & DARKNESS</p>
+<h2 id="sunTitle">Sun and darkness</h2>
+</div>
+<span class="status-pill" id="skyState">—</span>
+</div>
+<div class="metric-grid six">
+<div class="metric"><span>Next sunrise</span><strong id="sunriseValue">—</strong></div>
+<div class="metric"><span>Next sunset</span><strong id="sunsetValue">—</strong></div>
+<div class="metric"><span>Daylight length</span><strong id="dayLengthValue">—</strong></div>
+<div class="metric"><span>Civil twilight ends</span><strong id="civilDuskValue">—</strong></div>
+<div class="metric"><span>Darkness begins</span><strong id="astroDuskValue">—</strong></div>
+<div class="metric"><span>Darkness ends</span><strong id="astroDawnValue">—</strong></div>
+</div>
+</section>
+<div class="secondary-grid">
+<section class="card" aria-labelledby="constellationsTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">CONSTELLATIONS</p>
+<h2 id="constellationsTitle">Visible now</h2>
+</div>
+<span class="status-pill" id="constellationTime">—</span>
+</div>
+<div class="object-list" id="constellationList">
+<p class="muted">Waiting for location.</p>
+</div>
+</section>
+<section class="card" aria-labelledby="planetsTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">PLANETS</p>
+<h2 id="planetsTitle">Visible now</h2>
+</div>
+</div>
+<div class="object-list" id="planetList">
+<p class="muted">Waiting for location.</p>
+</div>
+</section>
+</div>
+<div class="secondary-grid">
+<section class="card" aria-labelledby="issTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">ORBIT</p>
+<h2 id="issTitle">International Space Station</h2>
+</div>
+<span class="status-pill">ISS</span>
+</div>
+<div id="issContent" class="iss-content">
+<p class="muted">Waiting for location.</p>
+</div>
+</section>
+<section class="card humans-card" aria-labelledby="humansTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">HUMANS IN SPACE</p>
+<h2 id="humansTitle">People currently up there</h2>
+</div>
+</div>
+<div class="human-count" id="humanCount">—</div>
+<p class="human-caption" id="humanCaption">Current human spaceflight count</p>
+<p class="muted" id="issCrewValue">ISS crew: —</p>
+</section>
+</div>
+<section class="card card-wide" aria-labelledby="lightTitle">
+<div class="card-heading-row">
+<div>
+<p class="card-kicker">NIGHT SKY BRIGHTNESS</p>
+<h2 id="lightTitle">Light pollution</h2>
+</div>
+<span class="status-pill">ESTIMATE</span>
+</div>
+<div id="lightContent" class="light-layout">
+<div>
+<div class="bortle-number" id="bortleNumber">—</div>
+<p class="bortle-description" id="bortleDescription">Light pollution estimate will appear here.</p>
+<p class="scale-note">1 = darkest skies · 9 = brightest skies</p>
+</div>
+<div class="metric-grid three">
+<div class="metric"><span>SQM estimate</span><strong id="sqmValue">—</strong></div>
+<div class="metric"><span>Estimated visible stars</span><strong id="starsValue">—</strong></div>
+<div class="metric"><span>Sky quality</span><strong id="skyQualityValue">—</strong></div>
+</div>
+</div>
+<p class="disclaimer" id="lightDisclaimer">This value is an estimate, not a direct measurement from your exact observing spot.</p>
+</section>
+</main>
+<footer>
+<p>Look Up calculates local astronomy in your browser and combines it with current public data.</p>
+<p class="source-line">Astronomy Engine · Open-Meteo · OpenStreetMap/Nominatim · NordAPI · CelesTrak · satellite.js · Launch Library 2 · D3-Celestial</p>
+<p class="privacy-line">Your chosen location is saved only on this device. Coordinates are sent to the services needed for weather, place naming and light-pollution estimates.</p>
+</footer>
+<div class="modal-backdrop hidden" id="locationModal" role="dialog" aria-modal="true" aria-labelledby="locationModalTitle">
+<div class="modal-card">
+<button class="modal-close" id="closeLocationModal" type="button" aria-label="Close">×</button>
+<p class="card-kicker">LOCATION</p>
+<h2 id="locationModalTitle">Where should Look Up watch the sky?</h2>
+<p class="muted">Use your device location, or search for a city. Your browser will ask permission before sharing your location.</p>
+<button class="primary-button" id="useLocationButton" type="button">📍 Use my location</button>
+<div class="or-divider"><span>or</span></div>
+<form id="citySearchForm">
+<label for="cityInput">Choose a city</label>
+<div class="search-row">
+<input id="cityInput" type="search" autocomplete="off" placeholder="Saint-Eustache, Portland, Manjimup…">
+<button class="secondary-button" type="submit">Search</button>
+</div>
+</form>
+<p class="modal-status" id="locationStatus"></p>
+<div class="city-results" id="cityResults"></div>
+<p class="tiny privacy-copy">Look Up does not have its own server or account system. If you use device location, your coordinates are stored in this browser and sent only to the public services needed to calculate local results.</p>
+</div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
